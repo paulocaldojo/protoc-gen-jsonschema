@@ -11,8 +11,9 @@ import (
 	"google.golang.org/protobuf/proto"
 	descriptor "google.golang.org/protobuf/types/descriptorpb"
 
-	protoc_gen_jsonschema "github.com/chrusty/protoc-gen-jsonschema"
 	protoc_gen_validate "github.com/envoyproxy/protoc-gen-validate/validate"
+
+	protoc_gen_jsonschema "github.com/chrusty/protoc-gen-jsonschema"
 )
 
 var (
@@ -380,11 +381,21 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 
 		// Optionally allow NULL values:
 		if messageFlags.AllowNullValues {
-			jsonSchemaType.OneOf = []*jsonschema.Type{
-				{Type: gojsonschema.TYPE_NULL},
-				{Type: jsonSchemaType.Type, Items: jsonSchemaType.Items},
+			if jsonSchemaType.Ref != "" {
+				jsonSchemaType.OneOf = []*jsonschema.Type{
+					{Type: gojsonschema.TYPE_NULL},
+					{Ref: jsonSchemaType.Ref, Items: jsonSchemaType.Items},
+				}
+			} else {
+
+				jsonSchemaType.OneOf = []*jsonschema.Type{
+					{Type: gojsonschema.TYPE_NULL},
+					{Type: jsonSchemaType.Type, Items: jsonSchemaType.Items},
+				}
 			}
+			// unset all object root level types
 			jsonSchemaType.Type = ""
+			jsonSchemaType.Ref = ""
 			jsonSchemaType.Items = nil
 		}
 	}
@@ -554,9 +565,14 @@ func (c *Converter) recursiveConvertMessageType(curPkg *ProtoPackage, msgDesc *d
 
 		// If we're allowing nulls then prepare a OneOf:
 		if messageFlags.AllowNullValues {
-			jsonSchemaType.OneOf = append(jsonSchemaType.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_NULL}, &jsonschema.Type{Type: jsonSchemaType.Type})
+			if jsonSchemaType.Ref != "" {
+				jsonSchemaType.OneOf = append(jsonSchemaType.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_NULL}, &jsonschema.Type{Ref: jsonSchemaType.Ref})
+			} else {
+				jsonSchemaType.OneOf = append(jsonSchemaType.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_NULL}, &jsonschema.Type{Type: jsonSchemaType.Type})
+			}
 			// and clear the Type that was previously set.
 			jsonSchemaType.Type = ""
+			jsonSchemaType.Ref = ""
 			return jsonSchemaType, nil
 		}
 
@@ -591,6 +607,8 @@ func (c *Converter) recursiveConvertMessageType(curPkg *ProtoPackage, msgDesc *d
 		jsonSchemaType.AdditionalProperties = []byte("true")
 	}
 
+	isFieldRequiredModeProto := c.Flags.FieldRequiredMode.Is(FieldRequiredModeProto)
+
 	c.logger.WithField("message_str", msgDesc.String()).Trace("Converting message")
 	for _, fieldDesc := range msgDesc.GetField() {
 
@@ -605,7 +623,7 @@ func (c *Converter) recursiveConvertMessageType(curPkg *ProtoPackage, msgDesc *d
 				}
 
 				// "Required" fields are added to the list of required attributes in our schema:
-				if fieldOptions.GetRequired() {
+				if fieldOptions.GetRequired() || (isFieldRequiredModeProto && !isNullableField(curPkg.file, fieldDesc)) {
 					c.logger.WithField("field_name", fieldDesc.GetName()).WithField("message_name", msgDesc.GetName()).Debug("Marking required field")
 					if c.Flags.UseJSONFieldnamesOnly {
 						jsonSchemaType.Required = append(jsonSchemaType.Required, fieldDesc.GetJsonName())
@@ -679,4 +697,15 @@ func dedupe(inputStrings []string) []string {
 		}
 	}
 	return outputStrings
+}
+
+// isNullableField returns true if field is nullable
+func isNullableField(fileDesc *descriptor.FileDescriptorProto, fieldDesc *descriptor.FieldDescriptorProto) bool {
+	switch fileDesc.GetSyntax() {
+	case "proto2", "":
+		return fieldDesc.GetLabel() == descriptor.FieldDescriptorProto_LABEL_OPTIONAL
+	case "proto3":
+		return fieldDesc.Proto3Optional != nil && *fieldDesc.Proto3Optional
+	}
+	return false
 }

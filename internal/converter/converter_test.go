@@ -500,6 +500,30 @@ func configureSampleProtos() map[string]sampleProto {
 			ObjectsToValidateFail: []string{testdata.WellKnownFail},
 			ObjectsToValidatePass: []string{testdata.WellKnownPass},
 		},
+		"Proto3Optional": {
+			Flags:                 ConverterFlags{FieldRequiredMode: FieldRequiredModeProto},
+			ExpectedJSONSchema:    []string{testdata.Proto3Optional},
+			FilesToGenerate:       []string{"Proto3Optional.proto"},
+			ProtoFileName:         "Proto3Optional.proto",
+			ObjectsToValidateFail: []string{testdata.Proto3OptionalFail},
+			ObjectsToValidatePass: []string{testdata.Proto3OptionalPass},
+		},
+		"Proto3OptionalNestedMessage": {
+			Flags:                 ConverterFlags{FieldRequiredMode: FieldRequiredModeProto},
+			ExpectedJSONSchema:    []string{testdata.Proto3OptionalNestedMessage, testdata.Proto3NestedMessageOptions},
+			FilesToGenerate:       []string{"Proto3OptionalNestedMessage.proto"},
+			ProtoFileName:         "Proto3OptionalNestedMessage.proto",
+			ObjectsToValidateFail: []string{testdata.Proto3OptionalNestedMessageFail},
+			ObjectsToValidatePass: []string{testdata.Proto3OptionalNestedMessagePass},
+		},
+		"Proto3OptionalNestedObject": {
+			Flags:                 ConverterFlags{FieldRequiredMode: FieldRequiredModeProto},
+			ExpectedJSONSchema:    []string{testdata.Proto3OptionalNestedObject},
+			FilesToGenerate:       []string{"Proto3OptionalNestedObject.proto"},
+			ProtoFileName:         "Proto3OptionalNestedObject.proto",
+			ObjectsToValidateFail: []string{testdata.Proto3OptionalNestedObjectFail},
+			ObjectsToValidatePass: []string{testdata.Proto3OptionalNestedObjectPass},
+		},
 	}
 }
 
