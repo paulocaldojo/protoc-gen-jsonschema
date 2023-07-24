@@ -1,0 +1,12 @@
+syntax = "proto3";
+package samples;
+
+message Proto3OptionalNestedMessage {
+  string query = 1;
+  optional Proto3NestedMessageOptions options = 2;
+}
+
+message Proto3NestedMessageOptions {
+  optional int32 page_number = 1;
+  optional int32 result_per_page = 2;
+}

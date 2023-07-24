@@ -8,6 +8,7 @@ import (
 
 // ProtoPackage describes a package of Protobuf, which is an container of message types.
 type ProtoPackage struct {
+	file     *descriptor.FileDescriptorProto
 	name     string
 	parent   *ProtoPackage
 	children map[string]*ProtoPackage
@@ -154,8 +155,8 @@ func (c *Converter) relativelyLookupNestedEnum(desc *descriptor.DescriptorProto,
 	return nil, false
 }
 
-func (c *Converter) relativelyLookupPackage(pkg *ProtoPackage, name string) (*ProtoPackage, bool) {
-	components := strings.Split(name, ".")
+func (c *Converter) relativelyLookupPackage(pkg *ProtoPackage, file *descriptor.FileDescriptorProto) (*ProtoPackage, bool) {
+	components := strings.Split(file.GetPackage(), ".")
 	for _, c := range components {
 		var ok bool
 		pkg, ok = pkg.children[c]
@@ -163,5 +164,6 @@ func (c *Converter) relativelyLookupPackage(pkg *ProtoPackage, name string) (*Pr
 			return nil, false
 		}
 	}
+	pkg.file = file
 	return pkg, true
 }

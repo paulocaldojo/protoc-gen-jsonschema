@@ -2,6 +2,7 @@ package converter
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -21,15 +22,21 @@ import (
 	protoc_gen_jsonschema "github.com/chrusty/protoc-gen-jsonschema"
 )
 
+var (
+	// ErrUndefinedFieldRequiredMode if returned when `field_required_mode` is invalid
+	ErrUndefinedFieldRequiredMode = errors.New("`field_required_mode` is invalid")
+)
+
 const (
-	defaultCommentDelimiter    = "  "
-	defaultExcludeCommentToken = "@exclude"
-	defaultFileExtension       = "json"
-	defaultPackageName         = "package"
-	defaultRefPrefix           = "#/definitions/"
-	messageDelimiter           = "+"
-	versionDraft04             = "http://json-schema.org/draft-04/schema#"
-	versionDraft06             = "http://json-schema.org/draft-06/schema#"
+	defaultCommentDelimiter                      = "  "
+	defaultExcludeCommentToken                   = "@exclude"
+	defaultFileExtension                         = "json"
+	defaultPackageName                           = "package"
+	defaultRefPrefix                             = "#/definitions/"
+	messageDelimiter                             = "+"
+	versionDraft04                               = "http://json-schema.org/draft-04/schema#"
+	versionDraft06                               = "http://json-schema.org/draft-06/schema#"
+	defaultFieldRequiredMode   FieldRequiredMode = FieldRequiredModeFieldOptions
 )
 
 // Converter is everything you need to convert protos to JSONSchemas:
@@ -59,6 +66,24 @@ type ConverterFlags struct {
 	PrefixSchemaFilesWithPackage bool
 	UseJSONFieldnamesOnly        bool
 	UseProtoAndJSONFieldNames    bool
+	FieldRequiredMode            FieldRequiredMode
+}
+
+func (f ConverterFlags) ValidateFieldRequiredMode(value string) error {
+	switch FieldRequiredMode(value) {
+	case FieldRequiredModeFieldOptions:
+		fallthrough
+	case FieldRequiredModeProto:
+		return nil
+	}
+	return ErrUndefinedFieldRequiredMode
+}
+
+// DefaultConverterFlags returns default converter flags
+func DefaultConverterFlags() ConverterFlags {
+	return ConverterFlags{
+		FieldRequiredMode: defaultFieldRequiredMode,
+	}
 }
 
 // New returns a configured *Converter (defaulting to draft-04 version):
@@ -95,7 +120,14 @@ func (c *Converter) ConvertFrom(rd io.Reader) (*plugin.CodeGeneratorResponse, er
 
 func (c *Converter) parseGeneratorParameters(parameters string) {
 	for _, parameter := range strings.Split(parameters, ",") {
-		switch parameter {
+		var option, value = "", ""
+		optionValue := strings.Split(parameter, "=")
+		option = optionValue[0]
+		if len(optionValue) > 1 {
+			value = optionValue[1]
+		}
+
+		switch option {
 		case "all_fields_required":
 			c.Flags.AllFieldsRequired = true
 		case "allow_null_values":
@@ -118,6 +150,13 @@ func (c *Converter) parseGeneratorParameters(parameters string) {
 			c.Flags.PrefixSchemaFilesWithPackage = true
 		case "proto_and_json_fieldnames":
 			c.Flags.UseProtoAndJSONFieldNames = true
+		case "field_required_mode":
+			err := c.Flags.ValidateFieldRequiredMode(value)
+			if err == ErrUndefinedFieldRequiredMode {
+				c.logger.Fatalf("`%s` is an invalid `field_required_mode`", value)
+			} else {
+				c.Flags.FieldRequiredMode = FieldRequiredMode(value)
+			}
 		}
 
 		// look for specific message targets
@@ -265,7 +304,7 @@ func (c *Converter) convertFile(file *descriptor.FileDescriptorProto, fileExtens
 			c.logger.WithField("proto_filename", protoFileName).WithField("enum_name", enum.GetName()).WithField("jsonschema_filename", jsonSchemaFileName).Info("Generating JSON-schema for stand-alone ENUM")
 
 			// Convert the ENUM:
-			enumJSONSchema, err := c.convertEnumType(enum, ConverterFlags{})
+			enumJSONSchema, err := c.convertEnumType(enum, DefaultConverterFlags())
 			if err != nil {
 				switch err {
 				case errIgnored:
@@ -293,7 +332,7 @@ func (c *Converter) convertFile(file *descriptor.FileDescriptorProto, fileExtens
 		}
 	} else {
 		// Otherwise process MESSAGES (packages):
-		pkg, ok := c.relativelyLookupPackage(globalPkg, file.GetPackage())
+		pkg, ok := c.relativelyLookupPackage(globalPkg, file)
 		if !ok {
 			return nil, fmt.Errorf("no such package found: %s", file.GetPackage())
 		}
@@ -444,4 +483,19 @@ func contains(haystack []string, needle string) bool {
 	}
 
 	return false
+}
+
+const (
+	// FieldRequiredModeProto ensures required fields are driven by Proto definitions
+	FieldRequiredModeProto FieldRequiredMode = "proto"
+	// FieldRequiredModeFieldOptions ensures required fields are driven by Field Custom Options
+	FieldRequiredModeFieldOptions FieldRequiredMode = "field_options"
+)
+
+// FieldRequiredMode defines the way required fields are driven
+type FieldRequiredMode string
+
+// Is returns true if field required mode is equals
+func (m FieldRequiredMode) Is(modeProto FieldRequiredMode) bool {
+	return m == modeProto
 }
