@@ -13,7 +13,7 @@ import (
 
 	protoc_gen_validate "github.com/envoyproxy/protoc-gen-validate/validate"
 
-	protoc_gen_jsonschema "github.com/chrusty/protoc-gen-jsonschema"
+	protoc_gen_jsonschema "github.com/paulocaldojo/protoc-gen-jsonschema"
 )
 
 var (
