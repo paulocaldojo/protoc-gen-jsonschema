@@ -59,6 +59,7 @@ type ConverterFlags struct {
 	PrefixSchemaFilesWithPackage bool
 	UseJSONFieldnamesOnly        bool
 	UseProtoAndJSONFieldNames    bool
+	DisallowReferences           bool
 }
 
 // New returns a configured *Converter (defaulting to draft-04 version):
@@ -118,6 +119,8 @@ func (c *Converter) parseGeneratorParameters(parameters string) {
 			c.Flags.PrefixSchemaFilesWithPackage = true
 		case "proto_and_json_fieldnames":
 			c.Flags.UseProtoAndJSONFieldNames = true
+		case "disallow_references":
+			c.Flags.DisallowReferences = true
 		}
 
 		// look for specific message targets
