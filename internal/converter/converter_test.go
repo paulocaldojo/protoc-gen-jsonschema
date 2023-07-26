@@ -524,6 +524,20 @@ func configureSampleProtos() map[string]sampleProto {
 			ObjectsToValidateFail: []string{testdata.Proto3OptionalNestedObjectFail},
 			ObjectsToValidatePass: []string{testdata.Proto3OptionalNestedObjectPass},
 		},
+		"EmbeddedNestedMessage": {
+			Flags:                 ConverterFlags{DisallowReferences: true},
+			ExpectedJSONSchema:    []string{testdata.EmbeddedNestedMessage, testdata.EmbeddedNestedMessagePayload},
+			FilesToGenerate:       []string{"EmbeddedNestedMessage.proto"},
+			ProtoFileName:         "EmbeddedNestedMessage.proto",
+			ObjectsToValidateFail: []string{testdata.EmbeddedNestedMessageFail},
+			ObjectsToValidatePass: []string{testdata.EmbeddedNestedMessagePass},
+		},
+		"EmbeddedNestedObject": {
+			Flags:              ConverterFlags{DisallowReferences: true},
+			ExpectedJSONSchema: []string{testdata.EmbeddedNestedObject},
+			FilesToGenerate:    []string{"EmbeddedNestedObject.proto"},
+			ProtoFileName:      "EmbeddedNestedObject.proto",
+		},
 	}
 }
 
