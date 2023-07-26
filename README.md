@@ -29,6 +29,7 @@ Logic
       - Optionally allows additional properties
       - Optionally marks all fields required
       - Optionally use Protobuf field required properties
+      - Optionally use embedded objects instead of `$ref`
       - Specially marked fields are labelled required (options.proto)
       - Specially marked fields are omitted (options.proto)
       - Special handling for "OneOf"
@@ -83,20 +84,21 @@ protoc \
 ```
 
 
-| CONFIG                             | DESCRIPTION                                                                                                              |
-|------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| `all_fields_required`              | Require all fields in schema                                                                                             |
-| `allow_null_values`                | Allow null values in schema                                                            |
-| `debug`                            | Enable debug logging                                                                                                     |
-| `disallow_additional_properties`   | Disallow additional properties in schema                                                                                 |
-| `disallow_bigints_as_strings`      | Disallow big integers as strings                                                                                         |
-| `enforce_oneof`                    | Interpret Proto "oneOf" clauses                                                                                          |
-| `enums_as_strings_only`            | Only include strings in the allowed values for enums                                                                     |
-| `file_extension`                   | Specify a custom file extension for generated schemas                                                                    |
-| `json_fieldnames`                  | Use JSON field names only                                                                                                |
-| `prefix_schema_files_with_package` | Prefix the output filename with package                                                                                  |
-| `proto_and_json_fieldnames`        | Use proto and JSON field names                                                                                           |
-| `field_required_mode`              | Use `proto` for Proto native or `field_options` for [custom options](#file-options).<br />Default: `field_options`       |
+| CONFIG                             | DESCRIPTION                                                                                                        |
+|------------------------------------|--------------------------------------------------------------------------------------------------------------------|
+| `all_fields_required`              | Require all fields in schema                                                                                       |
+| `allow_null_values`                | Allow null values in schema                                                                                        |
+| `debug`                            | Enable debug logging                                                                                               |
+| `disallow_additional_properties`   | Disallow additional properties in schema                                                                           |
+| `disallow_bigints_as_strings`      | Disallow big integers as strings                                                                                   |
+| `enforce_oneof`                    | Interpret Proto "oneOf" clauses                                                                                    |
+| `enums_as_strings_only`            | Only include strings in the allowed values for enums                                                               |
+| `file_extension`                   | Specify a custom file extension for generated schemas                                                              |
+| `json_fieldnames`                  | Use JSON field names only                                                                                          |
+| `prefix_schema_files_with_package` | Prefix the output filename with package                                                                            |
+| `proto_and_json_fieldnames`        | Use proto and JSON field names                                                                                     |
+| `field_required_mode`              | Use `proto` for Proto native or `field_options` for [custom options](#file-options).<br />Default: `field_options` |
+| `disallow_references`              | Disallow `$ref` and use embedded objects instead                                                                   |
 
 
 Custom Proto Options

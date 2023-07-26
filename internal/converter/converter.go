@@ -67,6 +67,7 @@ type ConverterFlags struct {
 	UseJSONFieldnamesOnly        bool
 	UseProtoAndJSONFieldNames    bool
 	FieldRequiredMode            FieldRequiredMode
+	DisallowReferences           bool
 }
 
 func (f ConverterFlags) ValidateFieldRequiredMode(value string) error {
@@ -157,6 +158,8 @@ func (c *Converter) parseGeneratorParameters(parameters string) {
 			} else {
 				c.Flags.FieldRequiredMode = FieldRequiredMode(value)
 			}
+		case "disallow_references":
+			c.Flags.DisallowReferences = true
 		}
 
 		// look for specific message targets

@@ -407,6 +407,23 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 
 // Converts a proto "MESSAGE" into a JSON-Schema:
 func (c *Converter) convertMessageType(curPkg *ProtoPackage, msgDesc *descriptor.DescriptorProto) (*jsonschema.Schema, error) {
+	// Produces a JSON schema without $references
+	if c.Flags.DisallowReferences {
+		duplicatedMessages := map[*descriptor.DescriptorProto]string{
+			msgDesc: msgDesc.GetName(),
+		}
+
+		refType, err := c.recursiveConvertMessageType(curPkg, msgDesc, "", duplicatedMessages, true)
+		if err != nil {
+			return nil, err
+		}
+
+		refType.Version = c.schemaVersion
+
+		return &jsonschema.Schema{
+			Type: refType,
+		}, nil
+	}
 
 	// Get a list of any nested messages in our schema:
 	duplicatedMessages, err := c.findNestedMessages(curPkg, msgDesc)
