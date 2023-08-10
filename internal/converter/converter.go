@@ -68,6 +68,7 @@ type ConverterFlags struct {
 	UseProtoAndJSONFieldNames    bool
 	FieldRequiredMode            FieldRequiredMode
 	DisallowReferences           bool
+	NonRequiredNullable          bool
 }
 
 func (f ConverterFlags) ValidateFieldRequiredMode(value string) error {
@@ -160,6 +161,8 @@ func (c *Converter) parseGeneratorParameters(parameters string) {
 			}
 		case "disallow_references":
 			c.Flags.DisallowReferences = true
+		case "non_required_nullable":
+			c.Flags.NonRequiredNullable = true
 		}
 
 		// look for specific message targets
@@ -228,11 +231,6 @@ func (c *Converter) convertEnumType(enum *descriptor.EnumDescriptorProto, conver
 		if !converterFlags.EnumsAsStringsOnly {
 			jsonSchemaType.OneOf = append(jsonSchemaType.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_INTEGER})
 		}
-	}
-
-	// Optionally allow NULL values:
-	if converterFlags.AllowNullValues {
-		jsonSchemaType.OneOf = append(jsonSchemaType.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_NULL})
 	}
 
 	// If we end up with just one option in OneOf, unwrap it

@@ -538,6 +538,18 @@ func configureSampleProtos() map[string]sampleProto {
 			FilesToGenerate:    []string{"EmbeddedNestedObject.proto"},
 			ProtoFileName:      "EmbeddedNestedObject.proto",
 		},
+		"Proto2OptionalNullable": {
+			Flags:              ConverterFlags{FieldRequiredMode: FieldRequiredModeProto, NonRequiredNullable: true},
+			ExpectedJSONSchema: []string{testdata.Proto2OptionalNullable},
+			FilesToGenerate:    []string{"Proto2OptionalNullable.proto"},
+			ProtoFileName:      "Proto2OptionalNullable.proto",
+		},
+		"Proto3OptionalNullable": {
+			Flags:              ConverterFlags{FieldRequiredMode: FieldRequiredModeProto, NonRequiredNullable: true},
+			ExpectedJSONSchema: []string{testdata.Proto3OptionalNullable},
+			FilesToGenerate:    []string{"Proto3OptionalNullable.proto"},
+			ProtoFileName:      "Proto3OptionalNullable.proto",
+		},
 	}
 }
 

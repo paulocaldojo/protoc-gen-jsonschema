@@ -30,6 +30,7 @@ Logic
       - Optionally marks all fields required
       - Optionally use Protobuf field required properties
       - Optionally use embedded objects instead of `$ref`
+      - Optionally forces non required fields with `null` type
       - Specially marked fields are labelled required (options.proto)
       - Specially marked fields are omitted (options.proto)
       - Special handling for "OneOf"
@@ -99,6 +100,7 @@ protoc \
 | `proto_and_json_fieldnames`        | Use proto and JSON field names                                                                                     |
 | `field_required_mode`              | Use `proto` for Proto native or `field_options` for [custom options](#file-options).<br />Default: `field_options` |
 | `disallow_references`              | Disallow `$ref` and use embedded objects instead                                                                   |
+| `non_required_nullable`            | Forces non required fields to have `null` type                                                                     |
 
 
 Custom Proto Options

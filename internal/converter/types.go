@@ -85,13 +85,15 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 		jsonSchemaType.Title, jsonSchemaType.Description = c.formatTitleAndDescription(nil, src)
 	}
 
+	isFieldNullable := messageFlags.AllowNullValues || (messageFlags.NonRequiredNullable && isNullableField(curPkg.file, desc))
+
 	// Switch the types, and pick a JSONSchema equivalent:
 	switch desc.GetType() {
 
 	// Float32:
 	case descriptor.FieldDescriptorProto_TYPE_DOUBLE,
 		descriptor.FieldDescriptorProto_TYPE_FLOAT:
-		if messageFlags.AllowNullValues {
+		if isFieldNullable {
 			jsonSchemaType.OneOf = []*jsonschema.Type{
 				{Type: gojsonschema.TYPE_NULL},
 				{Type: gojsonschema.TYPE_NUMBER},
@@ -106,7 +108,7 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 		descriptor.FieldDescriptorProto_TYPE_FIXED32,
 		descriptor.FieldDescriptorProto_TYPE_SFIXED32,
 		descriptor.FieldDescriptorProto_TYPE_SINT32:
-		if messageFlags.AllowNullValues {
+		if isFieldNullable {
 			jsonSchemaType.OneOf = []*jsonschema.Type{
 				{Type: gojsonschema.TYPE_NULL},
 				{Type: gojsonschema.TYPE_INTEGER},
@@ -124,7 +126,7 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 
 		// As integer:
 		if c.Flags.DisallowBigIntsAsStrings {
-			if messageFlags.AllowNullValues {
+			if isFieldNullable {
 				jsonSchemaType.OneOf = []*jsonschema.Type{
 					{Type: gojsonschema.TYPE_INTEGER},
 					{Type: gojsonschema.TYPE_NULL},
@@ -136,7 +138,7 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 
 		// As string:
 		if !c.Flags.DisallowBigIntsAsStrings {
-			if messageFlags.AllowNullValues {
+			if isFieldNullable {
 				jsonSchemaType.OneOf = []*jsonschema.Type{
 					{Type: gojsonschema.TYPE_STRING},
 					{Type: gojsonschema.TYPE_NULL},
@@ -170,7 +172,7 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 			}
 		}
 
-		if messageFlags.AllowNullValues {
+		if isFieldNullable {
 			jsonSchemaType.OneOf = []*jsonschema.Type{
 				{Type: gojsonschema.TYPE_NULL},
 				stringDef,
@@ -184,7 +186,7 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 
 	// Bytes:
 	case descriptor.FieldDescriptorProto_TYPE_BYTES:
-		if messageFlags.AllowNullValues {
+		if isFieldNullable {
 			jsonSchemaType.OneOf = []*jsonschema.Type{
 				{Type: gojsonschema.TYPE_NULL},
 				{
@@ -219,11 +221,16 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 			}
 		}
 
+		// Optionally allow NULL values:
+		if isFieldNullable {
+			enumSchema.OneOf = append(enumSchema.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_NULL})
+		}
+
 		jsonSchemaType = &enumSchema
 
 	// Bool:
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
-		if messageFlags.AllowNullValues {
+		if isFieldNullable {
 			jsonSchemaType.OneOf = []*jsonschema.Type{
 				{Type: gojsonschema.TYPE_NULL},
 				{Type: gojsonschema.TYPE_BOOLEAN},
@@ -287,7 +294,7 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 			jsonSchemaType.Items.OneOf = jsonSchemaType.OneOf
 		}
 
-		if messageFlags.AllowNullValues {
+		if isFieldNullable {
 			jsonSchemaType.OneOf = []*jsonschema.Type{
 				{Type: gojsonschema.TYPE_NULL},
 				{Type: gojsonschema.TYPE_ARRAY},
@@ -296,6 +303,7 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 			jsonSchemaType.Type = gojsonschema.TYPE_ARRAY
 			jsonSchemaType.OneOf = []*jsonschema.Type{}
 		}
+
 		return jsonSchemaType, nil
 	}
 
@@ -380,14 +388,13 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 		}
 
 		// Optionally allow NULL values:
-		if messageFlags.AllowNullValues {
+		if isFieldNullable {
 			if jsonSchemaType.Ref != "" {
 				jsonSchemaType.OneOf = []*jsonschema.Type{
 					{Type: gojsonschema.TYPE_NULL},
 					{Ref: jsonSchemaType.Ref, Items: jsonSchemaType.Items},
 				}
 			} else {
-
 				jsonSchemaType.OneOf = []*jsonschema.Type{
 					{Type: gojsonschema.TYPE_NULL},
 					{Type: jsonSchemaType.Type, Items: jsonSchemaType.Items},

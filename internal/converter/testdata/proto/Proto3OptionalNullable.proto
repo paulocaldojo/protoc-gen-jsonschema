@@ -1,0 +1,16 @@
+syntax = "proto3";
+package samples;
+import "options.proto";
+
+message Proto3OptionalNullable {
+  message Options {
+    optional int32 page_number = 1;
+    optional int32 result_per_page = 2;
+  }
+
+  string query = 1;
+  optional Options options = 2;
+  string option = 3 [(protoc.gen.jsonschema.field_options).required = true];
+}
+
+
