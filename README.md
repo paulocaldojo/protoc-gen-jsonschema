@@ -31,6 +31,7 @@ Logic
       - Optionally use Protobuf field required properties
       - Optionally use embedded objects instead of `$ref`
       - Optionally forces non required fields with `null` type
+      - Optionally use `type` field for multiple scalar types instead of `oneOf`
       - Specially marked fields are labelled required (options.proto)
       - Specially marked fields are omitted (options.proto)
       - Special handling for "OneOf"
@@ -101,6 +102,7 @@ protoc \
 | `field_required_mode`              | Use `proto` for Proto native or `field_options` for [custom options](#file-options).<br />Default: `field_options` |
 | `disallow_references`              | Disallow `$ref` and use embedded objects instead                                                                   |
 | `non_required_nullable`            | Forces non required fields to have `null` type                                                                     |
+| `types_array`                      | Use `type` field as an array for multiple scalar types instead of `oneOf[_].type`                                  |
 
 
 Custom Proto Options

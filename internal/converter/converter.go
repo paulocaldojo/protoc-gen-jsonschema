@@ -69,6 +69,7 @@ type ConverterFlags struct {
 	FieldRequiredMode            FieldRequiredMode
 	DisallowReferences           bool
 	NonRequiredNullable          bool
+	UseTypesArray                bool
 }
 
 func (f ConverterFlags) ValidateFieldRequiredMode(value string) error {
@@ -163,6 +164,8 @@ func (c *Converter) parseGeneratorParameters(parameters string) {
 			c.Flags.DisallowReferences = true
 		case "non_required_nullable":
 			c.Flags.NonRequiredNullable = true
+		case "types_array":
+			c.Flags.UseTypesArray = true
 		}
 
 		// look for specific message targets
@@ -183,10 +186,10 @@ func (c *Converter) parseGeneratorParameters(parameters string) {
 }
 
 // Converts a proto "ENUM" into a JSON-Schema:
-func (c *Converter) convertEnumType(enum *descriptor.EnumDescriptorProto, converterFlags ConverterFlags) (jsonschema.Type, error) {
+func (c *Converter) convertEnumType(enum *descriptor.EnumDescriptorProto, converterFlags ConverterFlags) (*Type, error) {
 
 	// Prepare a new jsonschema.Type for our eventual return value:
-	jsonSchemaType := jsonschema.Type{}
+	jsonSchemaType := Type{}
 
 	// Inherit the CLI converterFlags:
 	converterFlags.EnumsAsStringsOnly = c.Flags.EnumsAsStringsOnly
@@ -214,7 +217,7 @@ func (c *Converter) convertEnumType(enum *descriptor.EnumDescriptorProto, conver
 				// If this particular ENUM is marked with the "ignore" option then return a skipped error:
 				if enumOptions.GetIgnore() {
 					c.logger.WithField("msg_name", enum.GetName()).Debug("Skipping ignored enum")
-					return jsonSchemaType, errIgnored
+					return &jsonSchemaType, errIgnored
 				}
 			}
 		}
@@ -227,16 +230,29 @@ func (c *Converter) convertEnumType(enum *descriptor.EnumDescriptorProto, conver
 
 	// Use basic types if we're not opting to use constants for ENUMs:
 	if !converterFlags.EnumsAsConstants {
-		jsonSchemaType.OneOf = append(jsonSchemaType.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_STRING})
+		if c.Flags.UseTypesArray {
+			jsonSchemaType.TypesArray = append(jsonSchemaType.TypesArray, gojsonschema.TYPE_STRING)
+		} else {
+			jsonSchemaType.OneOf = append(jsonSchemaType.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_STRING})
+		}
 		if !converterFlags.EnumsAsStringsOnly {
-			jsonSchemaType.OneOf = append(jsonSchemaType.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_INTEGER})
+			if c.Flags.UseTypesArray {
+				jsonSchemaType.TypesArray = append(jsonSchemaType.TypesArray, gojsonschema.TYPE_INTEGER)
+			} else {
+				jsonSchemaType.OneOf = append(jsonSchemaType.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_INTEGER})
+			}
 		}
 	}
 
 	// If we end up with just one option in OneOf, unwrap it
-	if len(jsonSchemaType.OneOf) == 1 {
-		jsonSchemaType.Type = jsonSchemaType.OneOf[0].Type
+	if len(jsonSchemaType.OneOf) == 1 || len(jsonSchemaType.TypesArray) == 1 {
+		if c.Flags.UseTypesArray {
+			jsonSchemaType.Type.Type = jsonSchemaType.TypesArray[0]
+		} else {
+			jsonSchemaType.Type.Type = jsonSchemaType.OneOf[0].Type
+		}
 		jsonSchemaType.OneOf = nil
+		jsonSchemaType.TypesArray = []string{}
 	}
 
 	// If we need to trim prefix from enum value
@@ -274,7 +290,7 @@ func (c *Converter) convertEnumType(enum *descriptor.EnumDescriptorProto, conver
 		}
 	}
 
-	return jsonSchemaType, nil
+	return &jsonSchemaType, nil
 }
 
 // Converts a proto file into a JSON-Schema:

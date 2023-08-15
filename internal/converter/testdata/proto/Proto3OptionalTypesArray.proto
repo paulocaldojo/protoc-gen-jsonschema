@@ -1,0 +1,32 @@
+syntax = "proto3";
+package samples;
+import "options.proto";
+
+message Proto3OptionalTypesArray {
+  message Options {
+    optional int32 page_number = 1;
+    optional int32 result_per_page = 2;
+  }
+  enum NestedEnum {
+    FLAT             = 0;
+    NESTED_OBJECT    = 1;
+    NESTED_MESSAGE   = 2;
+    ARRAY_OF_TYPE    = 3;
+    ARRAY_OF_OBJECT  = 4;
+    ARRAY_OF_MESSAGE = 5;
+  }
+
+  string query = 1;
+  optional Options options = 2;
+  string option = 3 [(protoc.gen.jsonschema.field_options).required = true];
+  optional Proto3OptionalTypesArrayMessage message = 4;
+  optional NestedEnum nested_enum = 5;
+}
+
+message Proto3OptionalTypesArrayMessage {
+  string query = 1;
+  optional int32 options = 2;
+}
+
+
+

@@ -1,0 +1,27 @@
+syntax = "proto2";
+package samples;
+
+message Proto2OptionalTypesArray {
+    message Options {
+        optional int32 page_number = 1;
+        optional int32 result_per_page = 2;
+    }
+    enum NestedEnum {
+        FLAT             = 0;
+        NESTED_OBJECT    = 1;
+        NESTED_MESSAGE   = 2;
+        ARRAY_OF_TYPE    = 3;
+        ARRAY_OF_OBJECT  = 4;
+        ARRAY_OF_MESSAGE = 5;
+    }
+
+    required string query = 1;
+    optional Options options = 2;
+    optional Proto2OptionalTypesArrayMessage message = 3;
+    optional NestedEnum nested_enum = 4;
+}
+
+message Proto2OptionalTypesArrayMessage {
+    required string query = 1;
+    optional int32 options = 2;
+}

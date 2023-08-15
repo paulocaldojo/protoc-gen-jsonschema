@@ -550,6 +550,32 @@ func configureSampleProtos() map[string]sampleProto {
 			FilesToGenerate:    []string{"Proto3OptionalNullable.proto"},
 			ProtoFileName:      "Proto3OptionalNullable.proto",
 		},
+		"Proto3OptionalTypesArray": {
+			Flags: ConverterFlags{
+				FieldRequiredMode:   FieldRequiredModeProto,
+				DisallowReferences:  true,
+				NonRequiredNullable: true,
+				UseTypesArray:       true,
+			},
+			ExpectedJSONSchema:    []string{testdata.Proto3OptionalTypesArray, testdata.Proto3OptionalTypesArrayMessage},
+			FilesToGenerate:       []string{"Proto3OptionalTypesArray.proto"},
+			ProtoFileName:         "Proto3OptionalTypesArray.proto",
+			ObjectsToValidateFail: []string{testdata.Proto3OptionalTypesArrayFail},
+			ObjectsToValidatePass: []string{testdata.Proto3OptionalTypesArrayPass},
+		},
+		"Proto2OptionalTypesArray": {
+			Flags: ConverterFlags{
+				FieldRequiredMode:   FieldRequiredModeProto,
+				DisallowReferences:  true,
+				NonRequiredNullable: true,
+				UseTypesArray:       true,
+			},
+			ExpectedJSONSchema:    []string{testdata.Proto2OptionalTypesArray, testdata.Proto2OptionalTypesArrayMessage},
+			FilesToGenerate:       []string{"Proto2OptionalTypesArray.proto"},
+			ProtoFileName:         "Proto2OptionalTypesArray.proto",
+			ObjectsToValidateFail: []string{testdata.Proto2OptionalTypesArrayFail},
+			ObjectsToValidatePass: []string{testdata.Proto2OptionalTypesArrayPass},
+		},
 	}
 }
 

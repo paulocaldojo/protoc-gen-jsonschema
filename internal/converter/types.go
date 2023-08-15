@@ -36,6 +36,79 @@ var (
 	}
 )
 
+// Type defines a JSON schema type
+type Type struct {
+	jsonschema.Type
+	TypesArray []string `json:"type,omitempty"`
+}
+
+// Schema defines a JSON schema
+type Schema struct {
+	Type
+	Definitions map[string]*Type
+}
+
+func (s *Schema) MarshalJSON() ([]byte, error) {
+	var b []byte
+	var err error
+	if len(s.TypesArray) == 0 {
+		type Type_ jsonschema.Type
+		b, err = json.Marshal((Type_)(s.Type.Type))
+	} else {
+		type Type_ Type
+		b, err = json.Marshal((Type_)(s.Type))
+	}
+	if err != nil {
+		return nil, err
+	}
+	if s.Definitions == nil || len(s.Definitions) == 0 {
+		return b, nil
+	}
+	d, err := json.Marshal(struct {
+		Definitions Definitions `json:"definitions,omitempty"`
+	}{s.Definitions})
+	if err != nil {
+		return nil, err
+	}
+	if len(b) == 2 {
+		return d, nil
+	} else {
+		b[len(b)-1] = ','
+		return append(b, d[1:]...), nil
+	}
+}
+
+func (t *Type) MarshalJSON() ([]byte, error) {
+	var b []byte
+	var err error
+	if len(t.TypesArray) == 0 {
+		type Type_ jsonschema.Type
+		b, err = json.Marshal((Type_)(t.Type))
+	} else {
+		type Type_ Type
+		b, err = json.Marshal((Type_)(*t))
+	}
+	if err != nil {
+		return nil, err
+	}
+	if t.Extras == nil || len(t.Extras) == 0 {
+		return b, nil
+	}
+	m, err := json.Marshal(t.Extras)
+	if err != nil {
+		return nil, err
+	}
+	if len(b) == 2 {
+		return m, nil
+	} else {
+		b[len(b)-1] = ','
+		return append(b, m[1:]...), nil
+	}
+}
+
+// Definitions defines a group of types by key
+type Definitions map[string]*Type
+
 func (c *Converter) registerEnum(pkgName string, enum *descriptor.EnumDescriptorProto) {
 	pkg := globalPkg
 	if pkgName != "" {
@@ -75,10 +148,10 @@ func (c *Converter) registerType(pkgName string, msgDesc *descriptor.DescriptorP
 }
 
 // Convert a proto "field" (essentially a type-switch with some recursion):
-func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDescriptorProto, msgDesc *descriptor.DescriptorProto, duplicatedMessages map[*descriptor.DescriptorProto]string, messageFlags ConverterFlags) (*jsonschema.Type, error) {
+func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDescriptorProto, msgDesc *descriptor.DescriptorProto, duplicatedMessages map[*descriptor.DescriptorProto]string, messageFlags ConverterFlags) (*Type, error) {
 
-	// Prepare a new jsonschema.Type for our eventual return value:
-	jsonSchemaType := &jsonschema.Type{}
+	// Prepare a new Type for our eventual return value:
+	jsonSchemaType := &Type{}
 
 	// Generate a description from src comments (if available)
 	if src := c.sourceInfo.GetField(desc); src != nil {
@@ -94,12 +167,19 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 	case descriptor.FieldDescriptorProto_TYPE_DOUBLE,
 		descriptor.FieldDescriptorProto_TYPE_FLOAT:
 		if isFieldNullable {
-			jsonSchemaType.OneOf = []*jsonschema.Type{
-				{Type: gojsonschema.TYPE_NULL},
-				{Type: gojsonschema.TYPE_NUMBER},
+			if c.Flags.UseTypesArray {
+				jsonSchemaType.TypesArray = []string{
+					gojsonschema.TYPE_NULL,
+					gojsonschema.TYPE_NUMBER,
+				}
+			} else {
+				jsonSchemaType.OneOf = []*jsonschema.Type{
+					{Type: gojsonschema.TYPE_NULL},
+					{Type: gojsonschema.TYPE_NUMBER},
+				}
 			}
 		} else {
-			jsonSchemaType.Type = gojsonschema.TYPE_NUMBER
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_NUMBER
 		}
 
 	// Int32:
@@ -109,12 +189,19 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 		descriptor.FieldDescriptorProto_TYPE_SFIXED32,
 		descriptor.FieldDescriptorProto_TYPE_SINT32:
 		if isFieldNullable {
-			jsonSchemaType.OneOf = []*jsonschema.Type{
-				{Type: gojsonschema.TYPE_NULL},
-				{Type: gojsonschema.TYPE_INTEGER},
+			if c.Flags.UseTypesArray {
+				jsonSchemaType.TypesArray = []string{
+					gojsonschema.TYPE_NULL,
+					gojsonschema.TYPE_INTEGER,
+				}
+			} else {
+				jsonSchemaType.OneOf = []*jsonschema.Type{
+					{Type: gojsonschema.TYPE_NULL},
+					{Type: gojsonschema.TYPE_INTEGER},
+				}
 			}
 		} else {
-			jsonSchemaType.Type = gojsonschema.TYPE_INTEGER
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_INTEGER
 		}
 
 	// Int64:
@@ -127,24 +214,38 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 		// As integer:
 		if c.Flags.DisallowBigIntsAsStrings {
 			if isFieldNullable {
-				jsonSchemaType.OneOf = []*jsonschema.Type{
-					{Type: gojsonschema.TYPE_INTEGER},
-					{Type: gojsonschema.TYPE_NULL},
+				if c.Flags.UseTypesArray {
+					jsonSchemaType.TypesArray = []string{
+						gojsonschema.TYPE_INTEGER,
+						gojsonschema.TYPE_NULL,
+					}
+				} else {
+					jsonSchemaType.OneOf = []*jsonschema.Type{
+						{Type: gojsonschema.TYPE_INTEGER},
+						{Type: gojsonschema.TYPE_NULL},
+					}
 				}
 			} else {
-				jsonSchemaType.Type = gojsonschema.TYPE_INTEGER
+				jsonSchemaType.Type.Type = gojsonschema.TYPE_INTEGER
 			}
 		}
 
 		// As string:
 		if !c.Flags.DisallowBigIntsAsStrings {
 			if isFieldNullable {
-				jsonSchemaType.OneOf = []*jsonschema.Type{
-					{Type: gojsonschema.TYPE_STRING},
-					{Type: gojsonschema.TYPE_NULL},
+				if c.Flags.UseTypesArray {
+					jsonSchemaType.TypesArray = []string{
+						gojsonschema.TYPE_STRING,
+						gojsonschema.TYPE_NULL,
+					}
+				} else {
+					jsonSchemaType.OneOf = []*jsonschema.Type{
+						{Type: gojsonschema.TYPE_STRING},
+						{Type: gojsonschema.TYPE_NULL},
+					}
 				}
 			} else {
-				jsonSchemaType.Type = gojsonschema.TYPE_STRING
+				jsonSchemaType.Type.Type = gojsonschema.TYPE_STRING
 			}
 		}
 
@@ -173,12 +274,19 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 		}
 
 		if isFieldNullable {
-			jsonSchemaType.OneOf = []*jsonschema.Type{
-				{Type: gojsonschema.TYPE_NULL},
-				stringDef,
+			if c.Flags.UseTypesArray {
+				jsonSchemaType.TypesArray = []string{
+					gojsonschema.TYPE_NULL,
+					stringDef.Type,
+				}
+			} else {
+				jsonSchemaType.OneOf = []*jsonschema.Type{
+					{Type: gojsonschema.TYPE_NULL},
+					stringDef,
+				}
 			}
 		} else {
-			jsonSchemaType.Type = stringDef.Type
+			jsonSchemaType.Type.Type = stringDef.Type
 			jsonSchemaType.MinLength = stringDef.MinLength
 			jsonSchemaType.MaxLength = stringDef.MaxLength
 			jsonSchemaType.Pattern = stringDef.Pattern
@@ -187,16 +295,23 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 	// Bytes:
 	case descriptor.FieldDescriptorProto_TYPE_BYTES:
 		if isFieldNullable {
-			jsonSchemaType.OneOf = []*jsonschema.Type{
-				{Type: gojsonschema.TYPE_NULL},
-				{
-					Type:           gojsonschema.TYPE_STRING,
-					Format:         "binary",
-					BinaryEncoding: "base64",
-				},
+			if c.Flags.UseTypesArray {
+				jsonSchemaType.TypesArray = []string{
+					gojsonschema.TYPE_NULL,
+					gojsonschema.TYPE_STRING,
+				}
+			} else {
+				jsonSchemaType.OneOf = []*jsonschema.Type{
+					{Type: gojsonschema.TYPE_NULL},
+					{
+						Type:           gojsonschema.TYPE_STRING,
+						Format:         "binary",
+						BinaryEncoding: "base64",
+					},
+				}
 			}
 		} else {
-			jsonSchemaType.Type = gojsonschema.TYPE_STRING
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_STRING
 			jsonSchemaType.Format = "binary"
 			jsonSchemaType.BinaryEncoding = "base64"
 		}
@@ -223,20 +338,31 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 
 		// Optionally allow NULL values:
 		if isFieldNullable {
-			enumSchema.OneOf = append(enumSchema.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_NULL})
+			if c.Flags.UseTypesArray {
+				enumSchema.TypesArray = append(enumSchema.TypesArray, gojsonschema.TYPE_NULL)
+			} else {
+				enumSchema.OneOf = append(enumSchema.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_NULL})
+			}
 		}
 
-		jsonSchemaType = &enumSchema
+		jsonSchemaType = enumSchema
 
 	// Bool:
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
 		if isFieldNullable {
-			jsonSchemaType.OneOf = []*jsonschema.Type{
-				{Type: gojsonschema.TYPE_NULL},
-				{Type: gojsonschema.TYPE_BOOLEAN},
+			if c.Flags.UseTypesArray {
+				jsonSchemaType.TypesArray = []string{
+					gojsonschema.TYPE_NULL,
+					gojsonschema.TYPE_BOOLEAN,
+				}
+			} else {
+				jsonSchemaType.OneOf = []*jsonschema.Type{
+					{Type: gojsonschema.TYPE_NULL},
+					{Type: gojsonschema.TYPE_BOOLEAN},
+				}
 			}
 		} else {
-			jsonSchemaType.Type = gojsonschema.TYPE_BOOLEAN
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_BOOLEAN
 		}
 
 	// Group (object):
@@ -245,17 +371,17 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 		switch desc.GetTypeName() {
 		// Make sure that durations match a particular string pattern (eg 3.4s):
 		case ".google.protobuf.Duration":
-			jsonSchemaType.Type = gojsonschema.TYPE_STRING
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_STRING
 			jsonSchemaType.Format = "regex"
 			jsonSchemaType.Pattern = `^([0-9]+\.?[0-9]*|\.[0-9]+)s$`
 		case ".google.protobuf.Timestamp":
-			jsonSchemaType.Type = gojsonschema.TYPE_STRING
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_STRING
 			jsonSchemaType.Format = "date-time"
 		case ".google.protobuf.Value", ".google.protobuf.Struct":
-			jsonSchemaType.Type = gojsonschema.TYPE_OBJECT
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_OBJECT
 			jsonSchemaType.AdditionalProperties = []byte("true")
 		default:
-			jsonSchemaType.Type = gojsonschema.TYPE_OBJECT
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_OBJECT
 			if desc.GetLabel() == descriptor.FieldDescriptorProto_LABEL_OPTIONAL {
 				jsonSchemaType.AdditionalProperties = []byte("true")
 			}
@@ -272,7 +398,7 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 	}
 
 	// Recurse basic array:
-	if desc.GetLabel() == descriptor.FieldDescriptorProto_LABEL_REPEATED && jsonSchemaType.Type != gojsonschema.TYPE_OBJECT {
+	if desc.GetLabel() == descriptor.FieldDescriptorProto_LABEL_REPEATED && jsonSchemaType.Type.Type != gojsonschema.TYPE_OBJECT {
 		jsonSchemaType.Items = &jsonschema.Type{}
 
 		// Custom field options from protoc-gen-validate:
@@ -290,17 +416,24 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 			jsonSchemaType.Enum = nil
 			jsonSchemaType.Items.OneOf = nil
 		} else {
-			jsonSchemaType.Items.Type = jsonSchemaType.Type
+			jsonSchemaType.Items.Type = jsonSchemaType.Type.Type
 			jsonSchemaType.Items.OneOf = jsonSchemaType.OneOf
 		}
 
 		if isFieldNullable {
-			jsonSchemaType.OneOf = []*jsonschema.Type{
-				{Type: gojsonschema.TYPE_NULL},
-				{Type: gojsonschema.TYPE_ARRAY},
+			if c.Flags.UseTypesArray {
+				jsonSchemaType.TypesArray = []string{
+					gojsonschema.TYPE_NULL,
+					gojsonschema.TYPE_ARRAY,
+				}
+			} else {
+				jsonSchemaType.OneOf = []*jsonschema.Type{
+					{Type: gojsonschema.TYPE_NULL},
+					{Type: gojsonschema.TYPE_ARRAY},
+				}
 			}
 		} else {
-			jsonSchemaType.Type = gojsonschema.TYPE_ARRAY
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_ARRAY
 			jsonSchemaType.OneOf = []*jsonschema.Type{}
 		}
 
@@ -308,7 +441,7 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 	}
 
 	// Recurse nested objects / arrays of objects (if necessary):
-	if jsonSchemaType.Type == gojsonschema.TYPE_OBJECT {
+	if jsonSchemaType.Type.Type == gojsonschema.TYPE_OBJECT {
 
 		recordType, pkgName, ok := c.lookupType(curPkg, desc.GetTypeName())
 		if !ok {
@@ -350,8 +483,8 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 
 		// Arrays:
 		case desc.GetLabel() == descriptor.FieldDescriptorProto_LABEL_REPEATED:
-			jsonSchemaType.Items = recursedJSONSchemaType
-			jsonSchemaType.Type = gojsonschema.TYPE_ARRAY
+			jsonSchemaType.Items = &recursedJSONSchemaType.Type
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_ARRAY
 
 			// Build up the list of required fields:
 			if messageFlags.AllFieldsRequired && len(recursedJSONSchemaType.OneOf) == 0 && recursedJSONSchemaType.Properties != nil {
@@ -370,8 +503,8 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 			}
 
 			// If we're not an object then set the type from whatever we recursed:
-			if recursedJSONSchemaType.Type != gojsonschema.TYPE_OBJECT {
-				jsonSchemaType.Type = recursedJSONSchemaType.Type
+			if recursedJSONSchemaType.Type.Type != gojsonschema.TYPE_OBJECT {
+				jsonSchemaType.Type.Type = recursedJSONSchemaType.Type.Type
 			}
 
 			// Assume the attrbutes of the recursed value:
@@ -395,13 +528,20 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 					{Ref: jsonSchemaType.Ref, Items: jsonSchemaType.Items},
 				}
 			} else {
-				jsonSchemaType.OneOf = []*jsonschema.Type{
-					{Type: gojsonschema.TYPE_NULL},
-					{Type: jsonSchemaType.Type, Items: jsonSchemaType.Items},
+				if c.Flags.UseTypesArray {
+					jsonSchemaType.TypesArray = []string{
+						gojsonschema.TYPE_NULL,
+						jsonSchemaType.Type.Type,
+					}
+				} else {
+					jsonSchemaType.OneOf = []*jsonschema.Type{
+						{Type: gojsonschema.TYPE_NULL},
+						{Type: jsonSchemaType.Type.Type, Items: jsonSchemaType.Items},
+					}
 				}
 			}
 			// unset all object root level types
-			jsonSchemaType.Type = ""
+			jsonSchemaType.Type.Type = ""
 			jsonSchemaType.Ref = ""
 			jsonSchemaType.Items = nil
 		}
@@ -413,7 +553,7 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 }
 
 // Converts a proto "MESSAGE" into a JSON-Schema:
-func (c *Converter) convertMessageType(curPkg *ProtoPackage, msgDesc *descriptor.DescriptorProto) (*jsonschema.Schema, error) {
+func (c *Converter) convertMessageType(curPkg *ProtoPackage, msgDesc *descriptor.DescriptorProto) (*Schema, error) {
 	// Produces a JSON schema without $references
 	if c.Flags.DisallowReferences {
 		duplicatedMessages := map[*descriptor.DescriptorProto]string{
@@ -427,8 +567,8 @@ func (c *Converter) convertMessageType(curPkg *ProtoPackage, msgDesc *descriptor
 
 		refType.Version = c.schemaVersion
 
-		return &jsonschema.Schema{
-			Type: refType,
+		return &Schema{
+			Type: *refType,
 		}, nil
 	}
 
@@ -439,7 +579,7 @@ func (c *Converter) convertMessageType(curPkg *ProtoPackage, msgDesc *descriptor
 	}
 
 	// Build up a list of JSONSchema type definitions for every message:
-	definitions := jsonschema.Definitions{}
+	definitions := Definitions{}
 	for refmsgDesc, name := range duplicatedMessages {
 		refType, err := c.recursiveConvertMessageType(curPkg, refmsgDesc, "", duplicatedMessages, true)
 		if err != nil {
@@ -451,10 +591,12 @@ func (c *Converter) convertMessageType(curPkg *ProtoPackage, msgDesc *descriptor
 	}
 
 	// Put together a JSON schema with our discovered definitions, and a $ref for the root type:
-	newJSONSchema := &jsonschema.Schema{
-		Type: &jsonschema.Type{
-			Ref:     fmt.Sprintf("%s%s", c.refPrefix, msgDesc.GetName()),
-			Version: c.schemaVersion,
+	newJSONSchema := &Schema{
+		Type: Type{
+			Type: jsonschema.Type{
+				Ref:     fmt.Sprintf("%s%s", c.refPrefix, msgDesc.GetName()),
+				Version: c.schemaVersion,
+			},
 		},
 		Definitions: definitions,
 	}
@@ -509,10 +651,10 @@ func (c *Converter) recursiveFindNestedMessages(curPkg *ProtoPackage, msgDesc *d
 	return nil
 }
 
-func (c *Converter) recursiveConvertMessageType(curPkg *ProtoPackage, msgDesc *descriptor.DescriptorProto, pkgName string, duplicatedMessages map[*descriptor.DescriptorProto]string, ignoreDuplicatedMessages bool) (*jsonschema.Type, error) {
+func (c *Converter) recursiveConvertMessageType(curPkg *ProtoPackage, msgDesc *descriptor.DescriptorProto, pkgName string, duplicatedMessages map[*descriptor.DescriptorProto]string, ignoreDuplicatedMessages bool) (*Type, error) {
 
 	// Prepare a new jsonschema:
-	jsonSchemaType := new(jsonschema.Type)
+	jsonSchemaType := new(Type)
 
 	// Set some per-message flags from config and options:
 	messageFlags := c.Flags
@@ -552,39 +694,49 @@ func (c *Converter) recursiveConvertMessageType(curPkg *ProtoPackage, msgDesc *d
 	if msgDesc.Name != nil && wellKnownTypes[*msgDesc.Name] && pkgName == ".google.protobuf" {
 		switch *msgDesc.Name {
 		case "DoubleValue", "FloatValue":
-			jsonSchemaType.Type = gojsonschema.TYPE_NUMBER
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_NUMBER
 		case "Int32Value", "UInt32Value":
-			jsonSchemaType.Type = gojsonschema.TYPE_INTEGER
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_INTEGER
 		case "Int64Value", "UInt64Value":
 			// BigInt as ints
 			if messageFlags.DisallowBigIntsAsStrings {
-				jsonSchemaType.Type = gojsonschema.TYPE_INTEGER
+				jsonSchemaType.Type.Type = gojsonschema.TYPE_INTEGER
 			} else {
-
 				// BigInt as strings
-				jsonSchemaType.Type = gojsonschema.TYPE_STRING
+				jsonSchemaType.Type.Type = gojsonschema.TYPE_STRING
 			}
 
 		case "BoolValue":
-			jsonSchemaType.Type = gojsonschema.TYPE_BOOLEAN
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_BOOLEAN
 		case "BytesValue", "StringValue":
-			jsonSchemaType.Type = gojsonschema.TYPE_STRING
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_STRING
 		case "Value":
-			jsonSchemaType.OneOf = []*jsonschema.Type{
-				{Type: gojsonschema.TYPE_ARRAY},
-				{Type: gojsonschema.TYPE_BOOLEAN},
-				{Type: gojsonschema.TYPE_NUMBER},
-				{Type: gojsonschema.TYPE_OBJECT},
-				{Type: gojsonschema.TYPE_STRING},
+			if c.Flags.UseTypesArray {
+				jsonSchemaType.TypesArray = []string{
+					gojsonschema.TYPE_ARRAY,
+					gojsonschema.TYPE_BOOLEAN,
+					gojsonschema.TYPE_NUMBER,
+					gojsonschema.TYPE_OBJECT,
+					gojsonschema.TYPE_STRING,
+				}
+			} else {
+				jsonSchemaType.OneOf = []*jsonschema.Type{
+					{Type: gojsonschema.TYPE_ARRAY},
+					{Type: gojsonschema.TYPE_BOOLEAN},
+					{Type: gojsonschema.TYPE_NUMBER},
+					{Type: gojsonschema.TYPE_OBJECT},
+					{Type: gojsonschema.TYPE_STRING},
+				}
 			}
+
 			// jsonSchemaType.AdditionalProperties = []byte("true")
 		case "Duration":
-			jsonSchemaType.Type = gojsonschema.TYPE_STRING
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_STRING
 		case "Struct":
-			jsonSchemaType.Type = gojsonschema.TYPE_OBJECT
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_OBJECT
 			// jsonSchemaType.AdditionalProperties = []byte("true")
 		case "ListValue":
-			jsonSchemaType.Type = gojsonschema.TYPE_ARRAY
+			jsonSchemaType.Type.Type = gojsonschema.TYPE_ARRAY
 		}
 
 		// If we're allowing nulls then prepare a OneOf:
@@ -592,10 +744,17 @@ func (c *Converter) recursiveConvertMessageType(curPkg *ProtoPackage, msgDesc *d
 			if jsonSchemaType.Ref != "" {
 				jsonSchemaType.OneOf = append(jsonSchemaType.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_NULL}, &jsonschema.Type{Ref: jsonSchemaType.Ref})
 			} else {
-				jsonSchemaType.OneOf = append(jsonSchemaType.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_NULL}, &jsonschema.Type{Type: jsonSchemaType.Type})
+				if c.Flags.UseTypesArray {
+					jsonSchemaType.TypesArray = []string{
+						gojsonschema.TYPE_NULL,
+						jsonSchemaType.Type.Type,
+					}
+				} else {
+					jsonSchemaType.OneOf = append(jsonSchemaType.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_NULL}, &jsonschema.Type{Type: jsonSchemaType.Type.Type})
+				}
 			}
 			// and clear the Type that was previously set.
-			jsonSchemaType.Type = ""
+			jsonSchemaType.Type.Type = ""
 			jsonSchemaType.Ref = ""
 			return jsonSchemaType, nil
 		}
@@ -609,19 +768,28 @@ func (c *Converter) recursiveConvertMessageType(curPkg *ProtoPackage, msgDesc *d
 
 	// Look up references:
 	if refName, ok := duplicatedMessages[msgDesc]; ok && !ignoreDuplicatedMessages {
-		return &jsonschema.Type{
-			Ref: fmt.Sprintf("%s%s", c.refPrefix, refName),
+		return &Type{
+			Type: jsonschema.Type{
+				Ref: fmt.Sprintf("%s%s", c.refPrefix, refName),
+			},
 		}, nil
 	}
 
 	// Optionally allow NULL values:
 	if messageFlags.AllowNullValues {
-		jsonSchemaType.OneOf = []*jsonschema.Type{
-			{Type: gojsonschema.TYPE_NULL},
-			{Type: gojsonschema.TYPE_OBJECT},
+		if messageFlags.UseTypesArray {
+			jsonSchemaType.TypesArray = []string{
+				gojsonschema.TYPE_NULL,
+				gojsonschema.TYPE_OBJECT,
+			}
+		} else {
+			jsonSchemaType.OneOf = []*jsonschema.Type{
+				{Type: gojsonschema.TYPE_NULL},
+				{Type: gojsonschema.TYPE_OBJECT},
+			}
 		}
 	} else {
-		jsonSchemaType.Type = gojsonschema.TYPE_OBJECT
+		jsonSchemaType.Type.Type = gojsonschema.TYPE_OBJECT
 	}
 
 	// disallowAdditionalProperties will prevent validation where extra fields are found (outside of the schema):
