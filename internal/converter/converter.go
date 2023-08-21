@@ -70,6 +70,7 @@ type ConverterFlags struct {
 	DisallowReferences           bool
 	NonRequiredNullable          bool
 	UseTypesArray                bool
+	DisallowEmbeddedEnums        bool
 }
 
 func (f ConverterFlags) ValidateFieldRequiredMode(value string) error {
@@ -166,6 +167,8 @@ func (c *Converter) parseGeneratorParameters(parameters string) {
 			c.Flags.NonRequiredNullable = true
 		case "types_array":
 			c.Flags.UseTypesArray = true
+		case "disable_embedded_enums":
+			c.Flags.DisallowEmbeddedEnums = true
 		}
 
 		// look for specific message targets
@@ -284,9 +287,11 @@ func (c *Converter) convertEnumType(enum *descriptor.EnumDescriptorProto, conver
 		}
 
 		// Add the values to the ENUM:
-		jsonSchemaType.Enum = append(jsonSchemaType.Enum, valueName)
-		if !converterFlags.EnumsAsStringsOnly {
-			jsonSchemaType.Enum = append(jsonSchemaType.Enum, value.Number)
+		if !converterFlags.DisallowEmbeddedEnums {
+			jsonSchemaType.Enum = append(jsonSchemaType.Enum, valueName)
+			if !converterFlags.EnumsAsStringsOnly {
+				jsonSchemaType.Enum = append(jsonSchemaType.Enum, value.Number)
+			}
 		}
 	}
 
