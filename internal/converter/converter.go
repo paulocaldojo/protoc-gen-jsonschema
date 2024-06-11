@@ -189,7 +189,7 @@ func (c *Converter) parseGeneratorParameters(parameters string) {
 }
 
 // Converts a proto "ENUM" into a JSON-Schema:
-func (c *Converter) convertEnumType(enum *descriptor.EnumDescriptorProto, converterFlags ConverterFlags) (*Type, error) {
+func (c *Converter) convertEnumType(enum *descriptor.EnumDescriptorProto, converterFlags ConverterFlags, isFieldNullable bool) (*Type, error) {
 
 	// Prepare a new jsonschema.Type for our eventual return value:
 	jsonSchemaType := Type{}
@@ -244,6 +244,15 @@ func (c *Converter) convertEnumType(enum *descriptor.EnumDescriptorProto, conver
 			} else {
 				jsonSchemaType.OneOf = append(jsonSchemaType.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_INTEGER})
 			}
+		}
+	}
+
+	// Optionally allow NULL values:
+	if isFieldNullable {
+		if c.Flags.UseTypesArray {
+			jsonSchemaType.TypesArray = append(jsonSchemaType.TypesArray, gojsonschema.TYPE_NULL)
+		} else {
+			jsonSchemaType.OneOf = append(jsonSchemaType.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_NULL})
 		}
 	}
 
@@ -326,7 +335,7 @@ func (c *Converter) convertFile(file *descriptor.FileDescriptorProto, fileExtens
 			c.logger.WithField("proto_filename", protoFileName).WithField("enum_name", enum.GetName()).WithField("jsonschema_filename", jsonSchemaFileName).Info("Generating JSON-schema for stand-alone ENUM")
 
 			// Convert the ENUM:
-			enumJSONSchema, err := c.convertEnumType(enum, DefaultConverterFlags())
+			enumJSONSchema, err := c.convertEnumType(enum, DefaultConverterFlags(), false)
 			if err != nil {
 				switch err {
 				case errIgnored:

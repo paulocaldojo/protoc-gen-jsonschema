@@ -576,6 +576,18 @@ func configureSampleProtos() map[string]sampleProto {
 			ObjectsToValidateFail: []string{testdata.Proto2OptionalTypesArrayFail},
 			ObjectsToValidatePass: []string{testdata.Proto2OptionalTypesArrayPass},
 		},
+		"OptionalTypesArrayEnums": {
+			Flags: ConverterFlags{
+				FieldRequiredMode:   FieldRequiredModeProto,
+				EnumsAsStringsOnly:  true,
+				DisallowReferences:  true,
+				NonRequiredNullable: true,
+				UseTypesArray:       true,
+			},
+			ExpectedJSONSchema: []string{testdata.OptionalTypesArrayEnums},
+			FilesToGenerate:    []string{"OptionalTypesArrayEnums.proto"},
+			ProtoFileName:      "OptionalTypesArrayEnums.proto",
+		},
 		"DisallowEmbeddedEnumsAsStringsOnly": {
 			Flags: ConverterFlags{
 				EnumsAsStringsOnly:    true,

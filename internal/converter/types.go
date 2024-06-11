@@ -327,21 +327,12 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 		}
 
 		// We already have a converter for standalone ENUMs, so just use that:
-		enumSchema, err := c.convertEnumType(matchedEnum, messageFlags)
+		enumSchema, err := c.convertEnumType(matchedEnum, messageFlags, isFieldNullable)
 		if err != nil {
 			switch err {
 			case errIgnored:
 			default:
 				return nil, err
-			}
-		}
-
-		// Optionally allow NULL values:
-		if isFieldNullable {
-			if c.Flags.UseTypesArray {
-				enumSchema.TypesArray = append(enumSchema.TypesArray, gojsonschema.TYPE_NULL)
-			} else {
-				enumSchema.OneOf = append(enumSchema.OneOf, &jsonschema.Type{Type: gojsonschema.TYPE_NULL})
 			}
 		}
 
